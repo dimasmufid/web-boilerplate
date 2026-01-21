@@ -20,7 +20,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog"
 import {
   DropdownMenu,
@@ -200,12 +199,16 @@ export function NavUser({ compact }: { compact?: boolean }) {
                 open={isDialogOpen}
                 onOpenChange={setIsDialogOpen}
               >
-                <DialogTrigger asChild>
-                  <DropdownMenuItem disabled={!session?.user || isPending}>
-                    <IconUserCircle />
-                    Account
-                  </DropdownMenuItem>
-                </DialogTrigger>
+                <DropdownMenuItem
+                  disabled={!session?.user || isPending}
+                  onSelect={(event) => {
+                    event.preventDefault()
+                    setIsDialogOpen(true)
+                  }}
+                >
+                  <IconUserCircle />
+                  Account
+                </DropdownMenuItem>
                 <DialogContent>
                   <DialogHeader>
                     <DialogTitle>Edit profile</DialogTitle>
