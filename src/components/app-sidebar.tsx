@@ -5,6 +5,9 @@ import {
   IconDashboard,
   IconInnerShadowTop,
   IconUsers,
+  IconSettings,
+  IconHelp,
+  IconSearch,
 } from "@tabler/icons-react"
 
 import Link from "next/link"
@@ -21,6 +24,7 @@ import {
 } from "@/components/ui/sidebar"
 import { NavUser } from "@/components/nav-user"
 import { useSession } from "@/lib/auth-client"
+import { NavSecondary } from "@/components/nav-secondary"
 
 const baseNav = [
   {
@@ -28,7 +32,7 @@ const baseNav = [
     url: "/dashboard",
     icon: IconDashboard,
   },
-] as const
+]
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { data: session } = useSession()
@@ -50,6 +54,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       ]
     : baseNav
 
+  const navSecondary = [
+    {
+      title: "Settings",
+      url: "#",
+      icon: IconSettings,
+    },
+  ]
+
   return (
     <Sidebar collapsible="icon" variant="inset" {...props}>
       <SidebarHeader>
@@ -69,6 +81,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={navMain} />
+        <NavSecondary items={navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>
         <NavUser />
