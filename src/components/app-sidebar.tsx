@@ -20,23 +20,36 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
 import { NavUser } from "@/components/nav-user"
+import { useSession } from "@/lib/auth-client"
 
-const data = {
-  navMain: [
-    {
-      title: "Dashboard",
-      url: "/dashboard",
-      icon: IconDashboard,
-    },
-    {
-      title: "Admin",
-      url: "/admin",
-      icon: IconUsers,
-    },
-  ],
-}
+const baseNav = [
+  {
+    title: "Dashboard",
+    url: "/dashboard",
+    icon: IconDashboard,
+  },
+] as const
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const { data: session } = useSession()
+  const roles =
+    session?.user?.role && Array.isArray(session.user.role)
+      ? session.user.role
+      : typeof session?.user?.role === "string"
+        ? session.user.role.split(",").map((role) => role.trim())
+        : []
+  const isAdmin = roles.includes("admin")
+  const navMain = isAdmin
+    ? [
+        ...baseNav,
+        {
+          title: "Admin",
+          url: "/admin",
+          icon: IconUsers,
+        },
+      ]
+    : baseNav
+
   return (
     <Sidebar collapsible="icon" variant="inset" {...props}>
       <SidebarHeader>
@@ -55,7 +68,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain} />
+        <NavMain items={navMain} />
       </SidebarContent>
       <SidebarFooter>
         <NavUser />
