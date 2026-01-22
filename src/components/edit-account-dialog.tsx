@@ -14,6 +14,15 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import {
+  Item,
+  ItemActions,
+  ItemContent,
+  ItemDescription,
+  ItemGroup,
+  ItemSeparator,
+  ItemTitle,
+} from "@/components/ui/item"
 import { authClient } from "@/lib/auth-client"
 
 type EditAccountDialogProps = {
@@ -261,71 +270,68 @@ export function EditAccountDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Edit profile</DialogTitle>
           <DialogDescription>
             Update your name, password, or image.
           </DialogDescription>
         </DialogHeader>
-        <div className="grid gap-6">
-          <div className="rounded-lg border bg-background">
-            <div className="flex flex-col gap-4 border-b p-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="space-y-1">
-                <Label className="text-sm font-medium">
-                  Profile picture
-                </Label>
-                <p className="text-xs text-muted-foreground">
-                  Upload a square image for best results.
-                </p>
-              </div>
-              <div className="flex items-center gap-4">
-                <Avatar className="size-12">
-                  <AvatarImage
-                    src={imagePreview ?? undefined}
-                    alt={name || "Profile picture"}
-                  />
-                  <AvatarFallback>
-                    {getInitials(name || "User")}
-                  </AvatarFallback>
-                </Avatar>
-                <input
-                  ref={imageInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={handleImageChange}
-                  disabled={isPending || imageStatus === "saving"}
+        <ItemGroup className="rounded-xl border bg-card">
+          <Item size="sm" className="rounded-none border-0">
+            <ItemContent>
+              <ItemTitle>Profile picture</ItemTitle>
+              <ItemDescription>
+                Upload a square image for best results.
+              </ItemDescription>
+            </ItemContent>
+            <ItemActions className="w-full justify-between sm:w-auto sm:justify-end">
+              <Avatar className="size-10">
+                <AvatarImage
+                  src={imagePreview ?? undefined}
+                  alt={name || "Profile picture"}
                 />
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => imageInputRef.current?.click()}
-                  disabled={isPending || imageStatus === "saving"}
-                >
-                  Upload image
-                </Button>
-              </div>
+                <AvatarFallback>
+                  {getInitials(name || "User")}
+                </AvatarFallback>
+              </Avatar>
+              <input
+                ref={imageInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleImageChange}
+                disabled={isPending || imageStatus === "saving"}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => imageInputRef.current?.click()}
+                disabled={isPending || imageStatus === "saving"}
+              >
+                Upload image
+              </Button>
+            </ItemActions>
+          </Item>
+          {imageMessage ? (
+            <div className="px-4 pb-3 text-xs text-muted-foreground">
+              {imageStatus === "error" ? (
+                <span className="text-destructive">{imageMessage}</span>
+              ) : (
+                imageMessage
+              )}
             </div>
-            {imageMessage ? (
-              <p className="px-4 pb-4 text-xs text-muted-foreground">
-                {imageStatus === "error" ? (
-                  <span className="text-destructive">{imageMessage}</span>
-                ) : (
-                  imageMessage
-                )}
-              </p>
-            ) : null}
-          </div>
-
-          <div className="rounded-lg border bg-background">
-            <div className="flex flex-col gap-3 border-b p-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="space-y-1">
+          ) : null}
+          <ItemSeparator />
+          <Item size="sm" className="rounded-none border-0">
+            <ItemContent>
+              <ItemTitle>
                 <Label htmlFor="nav-user-name">Full name</Label>
-                <p className="text-xs text-muted-foreground">
-                  Visible to your workspace.
-                </p>
-              </div>
+              </ItemTitle>
+              <ItemDescription>Visible to your workspace.</ItemDescription>
+            </ItemContent>
+            <ItemActions className="w-full sm:w-auto">
               <Input
                 id="nav-user-name"
                 autoComplete="name"
@@ -340,50 +346,42 @@ export function EditAccountDialog({
                 onBlur={handleNameBlur}
                 placeholder="Your name"
                 disabled={isPending || nameStatus === "saving"}
-                className="sm:max-w-sm"
+                className="w-full sm:w-[240px]"
               />
-            </div>
-            {nameMessage ? (
-              <p className="px-4 pb-4 text-xs text-muted-foreground">
-                {nameStatus === "error" ? (
-                  <span className="text-destructive">{nameMessage}</span>
-                ) : (
-                  nameMessage
-                )}
-              </p>
-            ) : null}
-          </div>
-
-          <div className="rounded-lg border bg-background">
-            <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="space-y-1">
-                <Label>Password</Label>
-                <p className="text-xs text-muted-foreground">
-                  Update your password with confirmation.
-                </p>
-              </div>
+            </ItemActions>
+          </Item>
+          <ItemSeparator />
+          <Item size="sm" className="rounded-none border-0">
+            <ItemContent>
+              <ItemTitle>Password</ItemTitle>
+              <ItemDescription>
+                Update your password with confirmation.
+              </ItemDescription>
+            </ItemContent>
+            <ItemActions>
               <Button
                 type="button"
                 variant="outline"
+                size="sm"
                 onClick={() => setIsPasswordDialogOpen(true)}
                 disabled={isPending}
               >
                 Change password
               </Button>
+            </ItemActions>
+          </Item>
+          {passwordMessage ? (
+            <div className="px-4 pb-3 text-xs text-muted-foreground">
+              {passwordStatus === "error" ? (
+                <span className="text-destructive">
+                  {passwordMessage}
+                </span>
+              ) : (
+                passwordMessage
+              )}
             </div>
-            {passwordMessage ? (
-              <p className="px-4 pb-4 text-xs text-muted-foreground">
-                {passwordStatus === "error" ? (
-                  <span className="text-destructive">
-                    {passwordMessage}
-                  </span>
-                ) : (
-                  passwordMessage
-                )}
-              </p>
-            ) : null}
-          </div>
-        </div>
+          ) : null}
+        </ItemGroup>
       </DialogContent>
       <Dialog
         open={isPasswordDialogOpen}

@@ -2,14 +2,11 @@
 
 import * as React from "react"
 import {
-  IconBan,
   IconFilter,
-  IconLock,
   IconDots,
   IconRefresh,
   IconSearch,
   IconShieldLock,
-  IconUserCheck,
   IconUserPlus,
 } from "@tabler/icons-react"
 import { toast } from "sonner"
@@ -19,20 +16,8 @@ import { cn } from "@/lib/utils"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
-import {
-  Field,
-  FieldDescription,
-  FieldGroup,
-  FieldLabel,
-  FieldTitle,
-} from "@/components/ui/field"
+import { Card, CardContent } from "@/components/ui/card"
+import { Field, FieldDescription, FieldLabel, FieldTitle } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -53,12 +38,6 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs"
-import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -67,7 +46,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import {
   Dialog,
@@ -159,18 +137,24 @@ export default function AdminPage() {
   const [isLoading, setIsLoading] = React.useState(false)
   const [selectedUser, setSelectedUser] = React.useState<UserRecord | null>(null)
   const [actionLoading, setActionLoading] = React.useState<string | null>(null)
-  const [actionTab, setActionTab] = React.useState<
-    "roles" | "ban" | "security" | "sessions"
-  >("roles")
+  const [actionDialog, setActionDialog] = React.useState<{
+    type: "role" | "password" | "ban"
+    user: UserRecord
+  } | null>(null)
+  const [removeTarget, setRemoveTarget] = React.useState<UserRecord | null>(null)
 
-  const [createForm, setCreateForm] = React.useState({
+  const [createForm, setCreateForm] = React.useState<{
+    name: string
+    email: string
+    password: string
+    role: "user" | "admin"
+  }>({
     name: "",
     email: "",
     password: "",
     role: "user",
   })
-  const [targetUserId, setTargetUserId] = React.useState("")
-  const [roleInput, setRoleInput] = React.useState("admin")
+  const [roleInput, setRoleInput] = React.useState<"user" | "admin">("user")
   const [newPassword, setNewPassword] = React.useState("")
   const [banReason, setBanReason] = React.useState("")
   const [banExpiresIn, setBanExpiresIn] = React.useState("")
@@ -180,7 +164,6 @@ export default function AdminPage() {
 
   const loadUsers = React.useCallback(async (currentQuery: ListQuery) => {
     setIsLoading(true)
-    const toastId = toast.loading("Fetching users...")
     try {
       const payload: Record<string, unknown> = {
         searchField: currentQuery.searchField,
@@ -200,7 +183,9 @@ export default function AdminPage() {
         payload.filterValue = currentQuery.bannedFilter === "banned"
       }
 
-      const { data, error } = await authClient.admin.listUsers(payload)
+      const { data, error } = await authClient.admin.listUsers(
+        payload as unknown as Parameters<typeof authClient.admin.listUsers>[0]
+      )
       if (error) {
         throw error
       }
@@ -216,7 +201,7 @@ export default function AdminPage() {
         offset: result?.offset ?? currentQuery.offset,
       })
     } catch (error) {
-      toast.error(formatError(error), { id: toastId })
+      toast.error(formatError(error))
     } finally {
       setIsLoading(false)
     }
@@ -234,7 +219,6 @@ export default function AdminPage() {
 
   const handleSelectUser = (user: UserRecord) => {
     setSelectedUser(user)
-    setTargetUserId(user.id)
   }
 
   const handleCreateUser = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -247,12 +231,11 @@ export default function AdminPage() {
     setActionLoading("create-user")
     const toastId = toast.loading("Creating user...")
     try {
-      const roleValue = createForm.role.trim()
       const payload = {
         name: createForm.name.trim(),
         email: createForm.email.trim(),
         password: createForm.password,
-        role: roleValue ? roleValue : undefined,
+        role: createForm.role,
       }
       const { error } = await authClient.admin.createUser(payload)
       if (error) throw error
@@ -266,17 +249,9 @@ export default function AdminPage() {
     }
   }
 
-  const handleSetRole = async () => {
-    if (!targetUserId.trim()) {
-      toast.error("Select a user to update their role.")
-      return
-    }
-    const roles = roleInput
-      .split(",")
-      .map((role) => role.trim())
-      .filter(Boolean)
-    if (!roles.length) {
-      toast.error("Enter at least one role.")
+  const handleSetRole = async (userId: string) => {
+    if (!roleInput) {
+      toast.error("Select a role.")
       return
     }
 
@@ -284,8 +259,8 @@ export default function AdminPage() {
     const toastId = toast.loading("Updating role...")
     try {
       const { error } = await authClient.admin.setRole({
-        userId: targetUserId,
-        role: roles.length === 1 ? roles[0] : roles,
+        userId,
+        role: roleInput,
       })
       if (error) throw error
       toast.success("Role updated.", { id: toastId })
@@ -297,9 +272,9 @@ export default function AdminPage() {
     }
   }
 
-  const handleSetPassword = async () => {
-    if (!targetUserId.trim() || !newPassword.trim()) {
-      toast.error("User ID and new password are required.")
+  const handleSetPassword = async (userId: string) => {
+    if (!newPassword.trim()) {
+      toast.error("New password is required.")
       return
     }
 
@@ -307,7 +282,7 @@ export default function AdminPage() {
     const toastId = toast.loading("Resetting password...")
     try {
       const { error } = await authClient.admin.setUserPassword({
-        userId: targetUserId.trim(),
+        userId,
         newPassword: newPassword.trim(),
       })
       if (error) throw error
@@ -320,12 +295,7 @@ export default function AdminPage() {
     }
   }
 
-  const handleBanUser = async () => {
-    if (!targetUserId.trim()) {
-      toast.error("Select a user to ban.")
-      return
-    }
-
+  const handleBanUser = async (userId: string) => {
     const expiresValue = banExpiresIn.trim()
     const expiresIn = expiresValue ? Number(expiresValue) : undefined
     if (expiresValue && Number.isNaN(expiresIn)) {
@@ -337,7 +307,7 @@ export default function AdminPage() {
     const toastId = toast.loading("Banning user...")
     try {
       const { error } = await authClient.admin.banUser({
-        userId: targetUserId.trim(),
+        userId,
         banReason: banReason.trim() || undefined,
         banExpiresIn: expiresIn,
       })
@@ -351,17 +321,12 @@ export default function AdminPage() {
     }
   }
 
-  const handleUnbanUser = async () => {
-    if (!targetUserId.trim()) {
-      toast.error("Select a user to unban.")
-      return
-    }
-
+  const handleUnbanUser = async (userId: string) => {
     setActionLoading("unban-user")
     const toastId = toast.loading("Removing ban...")
     try {
       const { error } = await authClient.admin.unbanUser({
-        userId: targetUserId.trim(),
+        userId,
       })
       if (error) throw error
       toast.success("Ban removed.", { id: toastId })
@@ -373,17 +338,12 @@ export default function AdminPage() {
     }
   }
 
-  const handleRevokeSessions = async () => {
-    if (!targetUserId.trim()) {
-      toast.error("Select a user to revoke sessions.")
-      return
-    }
-
+  const handleRevokeSessions = async (userId: string) => {
     setActionLoading("revoke-sessions")
     const toastId = toast.loading("Revoking sessions...")
     try {
       const { error } = await authClient.admin.revokeUserSessions({
-        userId: targetUserId.trim(),
+        userId,
       })
       if (error) throw error
       toast.success("All sessions revoked.", { id: toastId })
@@ -394,17 +354,12 @@ export default function AdminPage() {
     }
   }
 
-  const handleImpersonate = async () => {
-    if (!targetUserId.trim()) {
-      toast.error("Select a user to impersonate.")
-      return
-    }
-
+  const handleImpersonate = async (userId: string) => {
     setActionLoading("impersonate")
     const toastId = toast.loading("Starting impersonation...")
     try {
       const { error } = await authClient.admin.impersonateUser({
-        userId: targetUserId.trim(),
+        userId,
       })
       if (error) throw error
       toast.success("Impersonation started.", { id: toastId })
@@ -429,22 +384,16 @@ export default function AdminPage() {
     }
   }
 
-  const handleRemoveUser = async () => {
-    if (!targetUserId.trim()) {
-      toast.error("Select a user to remove.")
-      return
-    }
-
+  const handleRemoveUser = async (userId: string) => {
     setActionLoading("remove-user")
     const toastId = toast.loading("Removing user...")
     try {
       const { error } = await authClient.admin.removeUser({
-        userId: targetUserId.trim(),
+        userId,
       })
       if (error) throw error
       toast.success("User removed.", { id: toastId })
       setSelectedUser(null)
-      setTargetUserId("")
       await loadUsers({ ...query, offset: 0 })
     } catch (error) {
       toast.error(formatError(error), { id: toastId })
@@ -460,8 +409,8 @@ export default function AdminPage() {
   const showSkeleton = isLoading && users.length === 0
 
   return (
-    <div className="@container/main flex flex-1 flex-col gap-6">
-      <div className="flex flex-col gap-4 px-4 pt-6 lg:px-6">
+    <div className="@container/main flex flex-1 flex-col gap-4">
+      <div className="flex flex-col gap-4 px-4 lg:px-6">
         {!isPending && !isAdmin ? (
           <Alert variant="destructive">
             <IconShieldLock />
@@ -474,91 +423,173 @@ export default function AdminPage() {
         ) : null}
       </div>
 
-      <div className="grid gap-6 px-4 pb-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:px-6">
+      <div className="grid gap-6 px-4 lg:px-6">
         <Card className="min-h-[480px]">
-          <CardHeader>
-            <CardTitle>User directory</CardTitle>
-            <CardDescription>
-              Search, filter, and select a user to perform admin actions.
-            </CardDescription>
-          </CardHeader>
           <CardContent className="flex flex-col gap-4">
-            <form
-              className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_auto]"
-              onSubmit={(event) => {
-                event.preventDefault()
-                applyQuery({ offset: 0 })
-              }}
-            >
-              <Field>
-                <FieldLabel htmlFor="search">Search</FieldLabel>
-                <div className="relative">
-                  <IconSearch className="text-muted-foreground pointer-events-none absolute left-3 top-3 size-4" />
-                  <Input
-                    id="search"
-                    className="pl-9"
-                    placeholder="Search by name or email"
-                    value={query.searchValue}
-                    onChange={(event) =>
-                      setQuery((prev) => ({
-                        ...prev,
-                        searchValue: event.target.value,
-                      }))
+            <Dialog>
+              <form
+                className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_auto]"
+                onSubmit={(event) => {
+                  event.preventDefault()
+                  applyQuery({ offset: 0 })
+                }}
+              >
+                <Field>
+                  <FieldLabel htmlFor="search">Search</FieldLabel>
+                  <div className="relative">
+                    <IconSearch className="text-muted-foreground pointer-events-none absolute left-3 top-3 size-4" />
+                    <Input
+                      id="search"
+                      className="pl-9"
+                      placeholder="Search by name or email"
+                      value={query.searchValue}
+                      onChange={(event) =>
+                        setQuery((prev) => ({
+                          ...prev,
+                          searchValue: event.target.value,
+                        }))
+                      }
+                    />
+                  </div>
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="search-field">Search field</FieldLabel>
+                  <Select
+                    value={query.searchField}
+                    onValueChange={(value: ListQuery["searchField"]) =>
+                      setQuery((prev) => ({ ...prev, searchField: value }))
                     }
-                  />
+                  >
+                    <SelectTrigger id="search-field">
+                      <SelectValue placeholder="Select" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="email">Email</SelectItem>
+                      <SelectItem value="name">Name</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="banned-filter">Ban status</FieldLabel>
+                  <Select
+                    value={query.bannedFilter}
+                    onValueChange={(value: ListQuery["bannedFilter"]) =>
+                      setQuery((prev) => ({ ...prev, bannedFilter: value }))
+                    }
+                  >
+                    <SelectTrigger id="banned-filter">
+                      <SelectValue placeholder="Filter" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All users</SelectItem>
+                      <SelectItem value="active">Active only</SelectItem>
+                      <SelectItem value="banned">Banned only</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <div className="flex items-end gap-2">
+                  <Button type="submit" variant="outline" disabled={isLoading}>
+                    <IconFilter />
+                    Apply
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => loadUsers(query)}
+                    disabled={isLoading}
+                  >
+                    <IconRefresh />
+                    Refresh
+                  </Button>
+                  <DialogTrigger asChild>
+                    <Button type="button">
+                      <IconUserPlus />
+                      Create user
+                    </Button>
+                  </DialogTrigger>
                 </div>
-              </Field>
-              <Field>
-                <FieldLabel htmlFor="search-field">Search field</FieldLabel>
-                <Select
-                  value={query.searchField}
-                  onValueChange={(value: ListQuery["searchField"]) =>
-                    setQuery((prev) => ({ ...prev, searchField: value }))
-                  }
-                >
-                  <SelectTrigger id="search-field">
-                    <SelectValue placeholder="Select" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="email">Email</SelectItem>
-                    <SelectItem value="name">Name</SelectItem>
-                  </SelectContent>
-                </Select>
-              </Field>
-              <Field>
-                <FieldLabel htmlFor="banned-filter">Ban status</FieldLabel>
-                <Select
-                  value={query.bannedFilter}
-                  onValueChange={(value: ListQuery["bannedFilter"]) =>
-                    setQuery((prev) => ({ ...prev, bannedFilter: value }))
-                  }
-                >
-                  <SelectTrigger id="banned-filter">
-                    <SelectValue placeholder="Filter" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All users</SelectItem>
-                    <SelectItem value="active">Active only</SelectItem>
-                    <SelectItem value="banned">Banned only</SelectItem>
-                  </SelectContent>
-                </Select>
-              </Field>
-              <div className="flex items-end gap-2">
-                <Button type="submit" disabled={isLoading}>
-                  <IconFilter />
-                  Apply
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => loadUsers(query)}
-                  disabled={isLoading}
-                >
-                  <IconRefresh />
-                  Refresh
-                </Button>
-              </div>
-            </form>
+              </form>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Create user</DialogTitle>
+                  <DialogDescription>
+                    Add a new account with optional role assignment.
+                  </DialogDescription>
+                </DialogHeader>
+                <form className="grid gap-4" onSubmit={handleCreateUser}>
+                  <Field>
+                    <FieldLabel htmlFor="create-name">Name</FieldLabel>
+                    <Input
+                      id="create-name"
+                      value={createForm.name}
+                      onChange={(event) =>
+                        setCreateForm((prev) => ({
+                          ...prev,
+                          name: event.target.value,
+                        }))
+                      }
+                      placeholder="James Smith"
+                    />
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor="create-email">Email</FieldLabel>
+                    <Input
+                      id="create-email"
+                      type="email"
+                      value={createForm.email}
+                      onChange={(event) =>
+                        setCreateForm((prev) => ({
+                          ...prev,
+                          email: event.target.value,
+                        }))
+                      }
+                      placeholder="user@example.com"
+                    />
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor="create-password">Password</FieldLabel>
+                    <Input
+                      id="create-password"
+                      type="password"
+                      value={createForm.password}
+                      onChange={(event) =>
+                        setCreateForm((prev) => ({
+                          ...prev,
+                          password: event.target.value,
+                        }))
+                      }
+                      placeholder="some-secure-password"
+                    />
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor="create-role">Role</FieldLabel>
+                    <Select
+                      value={createForm.role}
+                      onValueChange={(value) =>
+                        setCreateForm((prev) => ({
+                          ...prev,
+                          role: value as "user" | "admin",
+                        }))
+                      }
+                    >
+                      <SelectTrigger id="create-role">
+                        <SelectValue placeholder="Select role" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="user">User</SelectItem>
+                        <SelectItem value="admin">Admin</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                  <Button type="submit" disabled={actionLoading === "create-user"}>
+                    <IconUserPlus />
+                    {actionLoading === "create-user"
+                      ? "Creating..."
+                      : "Create user"}
+                  </Button>
+                </form>
+              </DialogContent>
+            </Dialog>
 
             <Separator />
 
@@ -722,7 +753,6 @@ export default function AdminPage() {
                                 <DropdownMenuItem
                                   onClick={() => {
                                     handleSelectUser(user)
-                                    setActionTab("roles")
                                   }}
                                 >
                                   Select user
@@ -730,7 +760,12 @@ export default function AdminPage() {
                                 <DropdownMenuItem
                                   onClick={() => {
                                     handleSelectUser(user)
-                                    setActionTab("roles")
+                                    const roles = normalizeRoles(user.role)
+                                    const firstRole = roles[0]
+                                    setRoleInput(
+                                      firstRole === "admin" ? "admin" : "user"
+                                    )
+                                    setActionDialog({ type: "role", user })
                                   }}
                                 >
                                   Set role
@@ -738,7 +773,8 @@ export default function AdminPage() {
                                 <DropdownMenuItem
                                   onClick={() => {
                                     handleSelectUser(user)
-                                    setActionTab("security")
+                                    setNewPassword("")
+                                    setActionDialog({ type: "password", user })
                                   }}
                                 >
                                   Reset password
@@ -746,18 +782,53 @@ export default function AdminPage() {
                                 <DropdownMenuItem
                                   onClick={() => {
                                     handleSelectUser(user)
-                                    setActionTab("ban")
+                                    setBanReason("")
+                                    setBanExpiresIn("")
+                                    setActionDialog({ type: "ban", user })
                                   }}
                                 >
-                                  Ban or unban
+                                  Ban user
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
                                   onClick={() => {
                                     handleSelectUser(user)
-                                    setActionTab("sessions")
+                                    void handleUnbanUser(user.id)
                                   }}
                                 >
-                                  Session controls
+                                  Unban user
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    handleSelectUser(user)
+                                    void handleRevokeSessions(user.id)
+                                  }}
+                                >
+                                  Revoke sessions
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    handleSelectUser(user)
+                                    void handleImpersonate(user.id)
+                                  }}
+                                >
+                                  Impersonate
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    handleSelectUser(user)
+                                    void handleStopImpersonating()
+                                  }}
+                                >
+                                  Stop impersonating
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  variant="destructive"
+                                  onClick={() => {
+                                    handleSelectUser(user)
+                                    setRemoveTarget(user)
+                                  }}
+                                >
+                                  Remove user
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
@@ -776,329 +847,164 @@ export default function AdminPage() {
               </Table>
             </div>
 
-            {selectedUser ? (
-              <div className="rounded-lg border bg-muted/30 p-4 text-sm">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <p className="font-medium">Selected user</p>
-                    <p className="text-muted-foreground">
-                      {selectedUser.name || selectedUser.email || selectedUser.id}
-                    </p>
-                  </div>
-                  <Badge variant="outline">
-                    {selectedUser.banned ? "Banned" : "Active"}
-                  </Badge>
-                </div>
-                <div className="mt-3 grid gap-1 text-xs text-muted-foreground">
-                  <span>Role: {normalizeRoles(selectedUser.role).join(", ") || "user"}</span>
-                  <span>Ban reason: {selectedUser.banReason || "-"}</span>
-                  <span>Ban expires: {formatDate(selectedUser.banExpires)}</span>
-                </div>
-              </div>
-            ) : null}
           </CardContent>
         </Card>
-
-        <div className="flex flex-col gap-6">
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button className="w-full" type="button">
-                <IconUserPlus />
-                Create user
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
+      </div>
+      <Dialog
+        open={actionDialog !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setActionDialog(null)
+          }
+        }}
+      >
+        <DialogContent>
+          {actionDialog?.type === "role" ? (
+            <>
               <DialogHeader>
-                <DialogTitle>Create user</DialogTitle>
+                <DialogTitle>Update role</DialogTitle>
                 <DialogDescription>
-                  Add a new account with optional role assignment.
+                  Set the role for {actionDialog.user.name || "this user"}.
                 </DialogDescription>
               </DialogHeader>
-              <form className="grid gap-4" onSubmit={handleCreateUser}>
+              <form
+                className="grid gap-4"
+                onSubmit={async (event) => {
+                  event.preventDefault()
+                  await handleSetRole(actionDialog.user.id)
+                  setActionDialog(null)
+                }}
+              >
                 <Field>
-                  <FieldLabel htmlFor="create-name">Name</FieldLabel>
-                  <Input
-                    id="create-name"
-                    value={createForm.name}
-                    onChange={(event) =>
-                      setCreateForm((prev) => ({
-                        ...prev,
-                        name: event.target.value,
-                      }))
-                    }
-                    placeholder="James Smith"
-                  />
+                  <FieldTitle>Role</FieldTitle>
+                  <Select
+                    value={roleInput}
+                    onValueChange={(value: string) => {
+                      if (value === "user" || value === "admin") {
+                        setRoleInput(value)
+                      }
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="user">User</SelectItem>
+                      <SelectItem value="admin">Admin</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </Field>
-                <Field>
-                  <FieldLabel htmlFor="create-email">Email</FieldLabel>
-                  <Input
-                    id="create-email"
-                    type="email"
-                    value={createForm.email}
-                    onChange={(event) =>
-                      setCreateForm((prev) => ({
-                        ...prev,
-                        email: event.target.value,
-                      }))
-                    }
-                    placeholder="user@example.com"
-                  />
-                </Field>
-                <Field>
-                  <FieldLabel htmlFor="create-password">Password</FieldLabel>
-                  <Input
-                    id="create-password"
-                    type="password"
-                    value={createForm.password}
-                    onChange={(event) =>
-                      setCreateForm((prev) => ({
-                        ...prev,
-                        password: event.target.value,
-                      }))
-                    }
-                    placeholder="some-secure-password"
-                  />
-                </Field>
-                <Field>
-                  <FieldLabel htmlFor="create-role">Role</FieldLabel>
-                  <Input
-                    id="create-role"
-                    value={createForm.role}
-                    onChange={(event) =>
-                      setCreateForm((prev) => ({
-                        ...prev,
-                        role: event.target.value,
-                      }))
-                    }
-                    placeholder="user"
-                  />
-                  <FieldDescription>
-                    Use comma-separated roles to assign multiple.
-                  </FieldDescription>
-                </Field>
-                <Button type="submit" disabled={actionLoading === "create-user"}>
-                  <IconUserPlus />
-                  {actionLoading === "create-user" ? "Creating..." : "Create user"}
+                <Button type="submit" disabled={actionLoading === "set-role"}>
+                  {actionLoading === "set-role" ? "Updating..." : "Set role"}
                 </Button>
               </form>
-            </DialogContent>
-          </Dialog>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Selected user actions</CardTitle>
-              <CardDescription>
-                Use the directory to pick a user, then perform actions below.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <FieldGroup>
+            </>
+          ) : null}
+          {actionDialog?.type === "password" ? (
+            <>
+              <DialogHeader>
+                <DialogTitle>Reset password</DialogTitle>
+                <DialogDescription>
+                  Force a new password for {actionDialog.user.name || "this user"}.
+                </DialogDescription>
+              </DialogHeader>
+              <form
+                className="grid gap-4"
+                onSubmit={async (event) => {
+                  event.preventDefault()
+                  await handleSetPassword(actionDialog.user.id)
+                  setActionDialog(null)
+                }}
+              >
                 <Field>
-                  <FieldLabel htmlFor="target-user-id">User ID</FieldLabel>
+                  <FieldTitle>New password</FieldTitle>
                   <Input
-                    id="target-user-id"
-                    value={targetUserId}
-                    onChange={(event) => setTargetUserId(event.target.value)}
-                    placeholder="user-id"
+                    type="password"
+                    value={newPassword}
+                    onChange={(event) => setNewPassword(event.target.value)}
+                    placeholder="new-password"
                   />
                 </Field>
-              </FieldGroup>
-              <Tabs
-                value={actionTab}
-                onValueChange={(value) =>
-                  setActionTab(value as typeof actionTab)
-                }
-                className="mt-4"
+                <Button type="submit" disabled={actionLoading === "set-password"}>
+                  {actionLoading === "set-password" ? "Updating..." : "Set password"}
+                </Button>
+              </form>
+            </>
+          ) : null}
+          {actionDialog?.type === "ban" ? (
+            <>
+              <DialogHeader>
+                <DialogTitle>Ban user</DialogTitle>
+                <DialogDescription>
+                  Optional reason and expiry in seconds for{" "}
+                  {actionDialog.user.name || "this user"}.
+                </DialogDescription>
+              </DialogHeader>
+              <form
+                className="grid gap-4"
+                onSubmit={async (event) => {
+                  event.preventDefault()
+                  await handleBanUser(actionDialog.user.id)
+                  setActionDialog(null)
+                }}
               >
-                <TabsList className="grid w-full grid-cols-4">
-                  <TabsTrigger value="roles">Roles</TabsTrigger>
-                  <TabsTrigger value="ban">Bans</TabsTrigger>
-                  <TabsTrigger value="security">Security</TabsTrigger>
-                  <TabsTrigger value="sessions">Sessions</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="roles" className="mt-4">
-                  <FieldGroup>
-                    <Field>
-                      <FieldTitle>Update role</FieldTitle>
-                      <FieldDescription>
-                        Set one or multiple roles for the user.
-                      </FieldDescription>
-                      <Input
-                        value={roleInput}
-                        onChange={(event) => setRoleInput(event.target.value)}
-                        placeholder="admin"
-                      />
-                    </Field>
-                    <Button
-                      type="button"
-                      onClick={handleSetRole}
-                      disabled={actionLoading === "set-role"}
-                    >
-                      <IconUserCheck />
-                      {actionLoading === "set-role" ? "Updating..." : "Set role"}
-                    </Button>
-                  </FieldGroup>
-                </TabsContent>
-
-                <TabsContent value="ban" className="mt-4">
-                  <FieldGroup>
-                    <Field>
-                      <FieldTitle>Ban user</FieldTitle>
-                      <FieldDescription>
-                        Optional reason and expiry in seconds.
-                      </FieldDescription>
-                      <Input
-                        value={banReason}
-                        onChange={(event) => setBanReason(event.target.value)}
-                        placeholder="Spamming"
-                      />
-                    </Field>
-                    <Field>
-                      <FieldLabel htmlFor="ban-expires">Ban expires in</FieldLabel>
-                      <Input
-                        id="ban-expires"
-                        value={banExpiresIn}
-                        onChange={(event) => setBanExpiresIn(event.target.value)}
-                        placeholder="604800"
-                      />
-                      <FieldDescription>
-                        Leave blank for a permanent ban.
-                      </FieldDescription>
-                    </Field>
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        type="button"
-                        onClick={handleBanUser}
-                        disabled={actionLoading === "ban-user"}
-                      >
-                        <IconBan />
-                        {actionLoading === "ban-user" ? "Banning..." : "Ban user"}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={handleUnbanUser}
-                        disabled={actionLoading === "unban-user"}
-                      >
-                        {actionLoading === "unban-user" ? "Unbanning..." : "Unban"}
-                      </Button>
-                    </div>
-                  </FieldGroup>
-                </TabsContent>
-
-                <TabsContent value="security" className="mt-4">
-                  <FieldGroup>
-                    <Field>
-                      <FieldTitle>Reset password</FieldTitle>
-                      <FieldDescription>
-                        Force a new password for the selected user.
-                      </FieldDescription>
-                      <Input
-                        type="password"
-                        value={newPassword}
-                        onChange={(event) => setNewPassword(event.target.value)}
-                        placeholder="new-password"
-                      />
-                    </Field>
-                    <Button
-                      type="button"
-                      onClick={handleSetPassword}
-                      disabled={actionLoading === "set-password"}
-                    >
-                      <IconLock />
-                      {actionLoading === "set-password"
-                        ? "Updating..."
-                        : "Set password"}
-                    </Button>
-                  </FieldGroup>
-                </TabsContent>
-
-                <TabsContent value="sessions" className="mt-4">
-                  <FieldGroup>
-                    <Field>
-                      <FieldTitle>Session controls</FieldTitle>
-                      <FieldDescription>
-                        Revoke all sessions or impersonate the user.
-                      </FieldDescription>
-                    </Field>
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={handleRevokeSessions}
-                        disabled={actionLoading === "revoke-sessions"}
-                      >
-                        {actionLoading === "revoke-sessions"
-                          ? "Revoking..."
-                          : "Revoke sessions"}
-                      </Button>
-                      <Button
-                        type="button"
-                        onClick={handleImpersonate}
-                        disabled={actionLoading === "impersonate"}
-                      >
-                        {actionLoading === "impersonate"
-                          ? "Impersonating..."
-                          : "Impersonate"}
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={handleStopImpersonating}
-                        disabled={actionLoading === "stop-impersonating"}
-                      >
-                        {actionLoading === "stop-impersonating"
-                          ? "Stopping..."
-                          : "Stop impersonating"}
-                      </Button>
-                    </div>
-                  </FieldGroup>
-                </TabsContent>
-              </Tabs>
-
-              <Separator className="my-6" />
-
-              <div className="flex flex-col gap-3">
-                <Alert variant="destructive">
-                  <IconBan />
-                  <AlertTitle>Danger zone</AlertTitle>
-                  <AlertDescription>
-                    Deleting a user permanently removes them and their data.
-                  </AlertDescription>
-                </Alert>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button
-                      variant="destructive"
-                      disabled={actionLoading === "remove-user"}
-                    >
-                      {actionLoading === "remove-user"
-                        ? "Removing..."
-                        : "Remove user"}
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Remove this user?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        This action cannot be undone. The user will be deleted
-                        permanently.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={handleRemoveUser}>
-                        Confirm removal
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+                <Field>
+                  <FieldTitle>Ban reason</FieldTitle>
+                  <Input
+                    value={banReason}
+                    onChange={(event) => setBanReason(event.target.value)}
+                    placeholder="Spamming"
+                  />
+                </Field>
+                <Field>
+                  <FieldLabel htmlFor="ban-expires">Ban expires in</FieldLabel>
+                  <Input
+                    id="ban-expires"
+                    value={banExpiresIn}
+                    onChange={(event) => setBanExpiresIn(event.target.value)}
+                    placeholder="604800"
+                  />
+                  <FieldDescription>
+                    Leave blank for a permanent ban.
+                  </FieldDescription>
+                </Field>
+                <Button type="submit" disabled={actionLoading === "ban-user"}>
+                  {actionLoading === "ban-user" ? "Banning..." : "Ban user"}
+                </Button>
+              </form>
+            </>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+      <AlertDialog
+        open={removeTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setRemoveTarget(null)
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove this user?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. The user will be deleted permanently.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                if (!removeTarget) return
+                await handleRemoveUser(removeTarget.id)
+                setRemoveTarget(null)
+              }}
+            >
+              Confirm removal
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
