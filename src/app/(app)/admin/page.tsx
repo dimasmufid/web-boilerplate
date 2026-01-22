@@ -2,22 +2,29 @@
 
 import * as React from "react"
 import {
+  IconBan,
   IconFilter,
   IconDots,
+  IconKey,
+  IconLockOpen,
+  IconLogout,
   IconRefresh,
   IconSearch,
   IconShieldLock,
+  IconUserCog,
   IconUserPlus,
+  IconUserScan,
 } from "@tabler/icons-react"
 import { toast } from "sonner"
 
 import { authClient, useSession } from "@/lib/auth-client"
 import { cn } from "@/lib/utils"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
-import { Field, FieldDescription, FieldLabel, FieldTitle } from "@/components/ui/field"
+import { Field, FieldLabel, FieldTitle } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
@@ -37,16 +44,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
 import {
   Dialog,
   DialogContent,
@@ -129,6 +126,17 @@ function formatDate(value: UserRecord["createdAt"] | UserRecord["banExpires"]) {
   }).format(date)
 }
 
+function getUserInitials(user: UserRecord) {
+  const source = (user.name || user.email || "").trim()
+  if (!source) return "?"
+  const parts = source.split(/\s+/).filter(Boolean)
+  const initials = parts
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("")
+  return initials || "?"
+}
+
 export default function AdminPage() {
   const { data: session, isPending } = useSession()
   const [users, setUsers] = React.useState<UserRecord[]>([])
@@ -141,7 +149,6 @@ export default function AdminPage() {
     type: "role" | "password" | "ban"
     user: UserRecord
   } | null>(null)
-  const [removeTarget, setRemoveTarget] = React.useState<UserRecord | null>(null)
 
   const [createForm, setCreateForm] = React.useState<{
     name: string
@@ -156,8 +163,9 @@ export default function AdminPage() {
   })
   const [roleInput, setRoleInput] = React.useState<"user" | "admin">("user")
   const [newPassword, setNewPassword] = React.useState("")
+  const [confirmPassword, setConfirmPassword] = React.useState("")
+  const [createConfirmPassword, setCreateConfirmPassword] = React.useState("")
   const [banReason, setBanReason] = React.useState("")
-  const [banExpiresIn, setBanExpiresIn] = React.useState("")
 
   const sessionRoles = normalizeRoles(session?.user?.role)
   const isAdmin = sessionRoles.includes("admin")
@@ -228,6 +236,11 @@ export default function AdminPage() {
       return
     }
 
+    if (createForm.password !== createConfirmPassword) {
+      toast.error("Passwords do not match.")
+      return
+    }
+
     setActionLoading("create-user")
     const toastId = toast.loading("Creating user...")
     try {
@@ -241,6 +254,7 @@ export default function AdminPage() {
       if (error) throw error
       toast.success("User created.", { id: toastId })
       setCreateForm({ name: "", email: "", password: "", role: "user" })
+      setCreateConfirmPassword("")
       await loadUsers({ ...query, offset: 0 })
     } catch (error) {
       toast.error(formatError(error), { id: toastId })
@@ -278,6 +292,11 @@ export default function AdminPage() {
       return
     }
 
+    if (newPassword !== confirmPassword) {
+      toast.error("Passwords do not match.")
+      return
+    }
+
     setActionLoading("set-password")
     const toastId = toast.loading("Resetting password...")
     try {
@@ -288,6 +307,7 @@ export default function AdminPage() {
       if (error) throw error
       toast.success("Password updated.", { id: toastId })
       setNewPassword("")
+      setConfirmPassword("")
     } catch (error) {
       toast.error(formatError(error), { id: toastId })
     } finally {
@@ -296,20 +316,12 @@ export default function AdminPage() {
   }
 
   const handleBanUser = async (userId: string) => {
-    const expiresValue = banExpiresIn.trim()
-    const expiresIn = expiresValue ? Number(expiresValue) : undefined
-    if (expiresValue && Number.isNaN(expiresIn)) {
-      toast.error("Ban expiry must be a number in seconds.")
-      return
-    }
-
     setActionLoading("ban-user")
     const toastId = toast.loading("Banning user...")
     try {
       const { error } = await authClient.admin.banUser({
         userId,
         banReason: banReason.trim() || undefined,
-        banExpiresIn: expiresIn,
       })
       if (error) throw error
       toast.success("User banned.", { id: toastId })
@@ -363,6 +375,7 @@ export default function AdminPage() {
       })
       if (error) throw error
       toast.success("Impersonation started.", { id: toastId })
+      window.location.assign("/dashboard")
     } catch (error) {
       toast.error(formatError(error), { id: toastId })
     } finally {
@@ -377,24 +390,6 @@ export default function AdminPage() {
       const { error } = await authClient.admin.stopImpersonating({})
       if (error) throw error
       toast.success("Impersonation ended.", { id: toastId })
-    } catch (error) {
-      toast.error(formatError(error), { id: toastId })
-    } finally {
-      setActionLoading(null)
-    }
-  }
-
-  const handleRemoveUser = async (userId: string) => {
-    setActionLoading("remove-user")
-    const toastId = toast.loading("Removing user...")
-    try {
-      const { error } = await authClient.admin.removeUser({
-        userId,
-      })
-      if (error) throw error
-      toast.success("User removed.", { id: toastId })
-      setSelectedUser(null)
-      await loadUsers({ ...query, offset: 0 })
     } catch (error) {
       toast.error(formatError(error), { id: toastId })
     } finally {
@@ -562,6 +557,18 @@ export default function AdminPage() {
                     />
                   </Field>
                   <Field>
+                    <FieldLabel htmlFor="create-confirm-password">Confirm password</FieldLabel>
+                    <Input
+                      id="create-confirm-password"
+                      type="password"
+                      value={createConfirmPassword}
+                      onChange={(event) =>
+                        setCreateConfirmPassword(event.target.value)
+                      }
+                      placeholder="confirm-password"
+                    />
+                  </Field>
+                  <Field>
                     <FieldLabel htmlFor="create-role">Role</FieldLabel>
                     <Select
                       value={createForm.role}
@@ -650,7 +657,6 @@ export default function AdminPage() {
                 <TableHeader className="bg-muted">
                   <TableRow>
                     <TableHead>User</TableHead>
-                    <TableHead>Email</TableHead>
                     <TableHead>Role</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Created</TableHead>
@@ -662,13 +668,13 @@ export default function AdminPage() {
                     Array.from({ length: 5 }).map((_, index) => (
                       <TableRow key={`skeleton-row-${index}`}>
                         <TableCell>
-                          <div className="flex flex-col gap-2">
-                            <Skeleton className="h-4 w-32" />
-                            <Skeleton className="h-3 w-40" />
+                          <div className="flex items-center gap-3">
+                            <Skeleton className="size-9 rounded-full" />
+                            <div className="flex flex-col gap-2">
+                              <Skeleton className="h-4 w-32" />
+                              <Skeleton className="h-3 w-40" />
+                            </div>
                           </div>
-                        </TableCell>
-                        <TableCell>
-                          <Skeleton className="h-4 w-40" />
                         </TableCell>
                         <TableCell>
                           <div className="flex gap-2">
@@ -701,16 +707,26 @@ export default function AdminPage() {
                           onClick={() => handleSelectUser(user)}
                         >
                           <TableCell>
-                            <div className="flex flex-col">
-                              <span className="font-medium">
-                                {user.name || "Unnamed"}
-                              </span>
-                              <span className="text-muted-foreground text-xs">
-                                {user.id}
-                              </span>
+                            <div className="flex items-center gap-3">
+                              <Avatar className="size-9">
+                                <AvatarImage
+                                  src={user.image || undefined}
+                                  alt={user.name || user.email || "User avatar"}
+                                />
+                                <AvatarFallback>
+                                  {getUserInitials(user)}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="flex flex-col">
+                                <span className="font-medium">
+                                  {user.name || "Unnamed"}
+                                </span>
+                                <span className="text-muted-foreground text-xs">
+                                  {user.email || "-"}
+                                </span>
+                              </div>
                             </div>
                           </TableCell>
-                          <TableCell>{user.email || "-"}</TableCell>
                           <TableCell>
                             <div className="flex flex-wrap gap-1">
                               {roles.length ? (
@@ -751,13 +767,7 @@ export default function AdminPage() {
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
                                 <DropdownMenuItem
-                                  onClick={() => {
-                                    handleSelectUser(user)
-                                  }}
-                                >
-                                  Select user
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
+                                  className="gap-2"
                                   onClick={() => {
                                     handleSelectUser(user)
                                     const roles = normalizeRoles(user.role)
@@ -768,68 +778,66 @@ export default function AdminPage() {
                                     setActionDialog({ type: "role", user })
                                   }}
                                 >
-                                  Set role
+                                  <IconUserCog className="size-4 text-primary" />
+                                  Change Role
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
+                                  className="gap-2"
                                   onClick={() => {
                                     handleSelectUser(user)
                                     setNewPassword("")
+                                    setConfirmPassword("")
                                     setActionDialog({ type: "password", user })
                                   }}
                                 >
+                                  <IconKey className="size-4 text-primary" />
                                   Reset password
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
-                                  onClick={() => {
-                                    handleSelectUser(user)
-                                    setBanReason("")
-                                    setBanExpiresIn("")
-                                    setActionDialog({ type: "ban", user })
-                                  }}
-                                >
-                                  Ban user
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={() => {
-                                    handleSelectUser(user)
-                                    void handleUnbanUser(user.id)
-                                  }}
-                                >
-                                  Unban user
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
+                                  className="gap-2"
                                   onClick={() => {
                                     handleSelectUser(user)
                                     void handleRevokeSessions(user.id)
                                   }}
                                 >
+                                  <IconLogout className="size-4 text-primary" />
                                   Revoke sessions
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
+                                  className="gap-2"
                                   onClick={() => {
                                     handleSelectUser(user)
                                     void handleImpersonate(user.id)
                                   }}
                                 >
+                                  <IconUserScan className="size-4 text-primary" />
                                   Impersonate
                                 </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={() => {
-                                    handleSelectUser(user)
-                                    void handleStopImpersonating()
-                                  }}
-                                >
-                                  Stop impersonating
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  variant="destructive"
-                                  onClick={() => {
-                                    handleSelectUser(user)
-                                    setRemoveTarget(user)
-                                  }}
-                                >
-                                  Remove user
-                                </DropdownMenuItem>
+                                {user.banned ? (
+                                  <DropdownMenuItem
+                                    className="gap-2"
+                                    onClick={() => {
+                                      handleSelectUser(user)
+                                      void handleUnbanUser(user.id)
+                                    }}
+                                  >
+                                    <IconLockOpen className="size-4 text-primary" />
+                                    Unban user
+                                  </DropdownMenuItem>
+                                ) : (
+                                  <DropdownMenuItem
+                                    className="gap-2"
+                                    onClick={() => {
+                                      handleSelectUser(user)
+                                      setBanReason("")
+                                      setActionDialog({ type: "ban", user })
+                                    }}
+                                    variant="destructive"
+                                  >
+                                    <IconBan className="size-4 text-destructive" />
+                                    Ban user
+                                  </DropdownMenuItem>
+                                )}
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </TableCell>
@@ -838,7 +846,7 @@ export default function AdminPage() {
                     })
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center">
+                      <TableCell colSpan={5} className="text-center">
                         {isLoading ? "Loading users..." : "No users found."}
                       </TableCell>
                     </TableRow>
@@ -925,6 +933,15 @@ export default function AdminPage() {
                     placeholder="new-password"
                   />
                 </Field>
+                <Field>
+                  <FieldTitle>Confirm password</FieldTitle>
+                  <Input
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(event) => setConfirmPassword(event.target.value)}
+                    placeholder="confirm-password"
+                  />
+                </Field>
                 <Button type="submit" disabled={actionLoading === "set-password"}>
                   {actionLoading === "set-password" ? "Updating..." : "Set password"}
                 </Button>
@@ -936,8 +953,8 @@ export default function AdminPage() {
               <DialogHeader>
                 <DialogTitle>Ban user</DialogTitle>
                 <DialogDescription>
-                  Optional reason and expiry in seconds for{" "}
-                  {actionDialog.user.name || "this user"}.
+                  Optional reason for {actionDialog.user.name || "this user"}.
+                  The ban stays in place until you unban them.
                 </DialogDescription>
               </DialogHeader>
               <form
@@ -956,19 +973,11 @@ export default function AdminPage() {
                     placeholder="Spamming"
                   />
                 </Field>
-                <Field>
-                  <FieldLabel htmlFor="ban-expires">Ban expires in</FieldLabel>
-                  <Input
-                    id="ban-expires"
-                    value={banExpiresIn}
-                    onChange={(event) => setBanExpiresIn(event.target.value)}
-                    placeholder="604800"
-                  />
-                  <FieldDescription>
-                    Leave blank for a permanent ban.
-                  </FieldDescription>
-                </Field>
-                <Button type="submit" disabled={actionLoading === "ban-user"}>
+                <Button
+                  type="submit"
+                  disabled={actionLoading === "ban-user"}
+                  variant="destructive"
+                >
                   {actionLoading === "ban-user" ? "Banning..." : "Ban user"}
                 </Button>
               </form>
@@ -976,35 +985,6 @@ export default function AdminPage() {
           ) : null}
         </DialogContent>
       </Dialog>
-      <AlertDialog
-        open={removeTarget !== null}
-        onOpenChange={(open) => {
-          if (!open) {
-            setRemoveTarget(null)
-          }
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Remove this user?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. The user will be deleted permanently.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={async () => {
-                if (!removeTarget) return
-                await handleRemoveUser(removeTarget.id)
-                setRemoveTarget(null)
-              }}
-            >
-              Confirm removal
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   )
 }
