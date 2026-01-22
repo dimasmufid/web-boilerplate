@@ -1,36 +1,167 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Next.js Boilerplate
 
-## Getting Started
+A modern, production-ready Next.js boilerplate template featuring authentication, database integration, and a beautiful UI component library.
 
-First, run the development server:
+## 🚀 Tech Stack
+
+- **[Next.js 16](https://nextjs.org/)** - React framework with App Router
+- **[Bun](https://bun.sh/)** - Fast JavaScript runtime and package manager
+- **[Drizzle ORM](https://orm.drizzle.team/)** - TypeScript ORM for PostgreSQL
+- **[Better Auth](https://www.better-auth.com/)** - Modern authentication library
+- **[shadcn/ui](https://ui.shadcn.com/)** - Beautiful, accessible component library
+- **[Tailwind CSS v4](https://tailwindcss.com/)** - Utility-first CSS framework
+- **[TypeScript](https://www.typescriptlang.org/)** - Type-safe JavaScript
+
+## ✨ Features
+
+- 🔐 **Authentication** - Email/password authentication with Better Auth
+- 👤 **Admin Panel** - Built-in admin functionality with user management
+- 🎨 **UI Components** - Pre-configured shadcn/ui components (New York style)
+- 🌓 **Dark Mode** - Theme switching with next-themes
+- 📊 **Data Tables** - Advanced table components with sorting, filtering, and pagination
+- 📱 **Responsive Design** - Mobile-first responsive layouts
+- 🐳 **Docker Support** - Production-ready Dockerfile included
+- 🗄️ **Database Migrations** - Drizzle migrations for schema management
+
+## 📋 Prerequisites
+
+- [Bun](https://bun.sh/) (v1.2.0 or higher)
+- PostgreSQL database (local or hosted)
+- Node.js (for Docker builds)
+
+## 🏁 Getting Started
+
+### 1. Clone the repository
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+git clone <your-repo-url>
+cd boilerplate
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 2. Install dependencies
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+bun install
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### 3. Set up environment variables
 
-## Learn More
+Copy `.env.example` to `.env.local` and fill in your values:
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+cp .env.example .env.local
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Required environment variables:
+- `DATABASE_URL` - PostgreSQL connection string
+- `BETTER_AUTH_SECRET` - Secret key for Better Auth (generate with `openssl rand -base64 32`)
+- `BETTER_AUTH_URL` - Your application URL (e.g., `http://localhost:3000`)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### 4. Set up the database
 
-## Deploy on Vercel
+Run database migrations:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+bunx drizzle-kit push
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Or generate migrations:
+
+```bash
+bunx drizzle-kit generate
+bunx drizzle-kit migrate
+```
+
+You can also use `npx drizzle-kit` if you prefer npm.
+
+### 5. Run the development server
+
+```bash
+bun run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+## 📁 Project Structure
+
+```
+boilerplate/
+├── src/
+│   ├── app/                    # Next.js App Router pages
+│   │   ├── (app)/             # Protected app routes
+│   │   │   ├── admin/         # Admin panel
+│   │   │   └── dashboard/     # Dashboard page
+│   │   ├── (auth)/            # Auth routes
+│   │   │   ├── sign-in/       # Sign in page
+│   │   │   └── sign-up/       # Sign up page
+│   │   └── api/               # API routes
+│   │       └── auth/          # Better Auth API routes
+│   ├── components/            # React components
+│   │   ├── ui/               # shadcn/ui components
+│   │   └── ...               # Custom components
+│   ├── db/                   # Database schema and config
+│   │   ├── auth-schema.ts    # Better Auth schema
+│   │   └── index.ts          # Drizzle database instance
+│   ├── lib/                  # Utilities and helpers
+│   │   ├── auth.ts           # Better Auth server config
+│   │   ├── auth-client.ts    # Better Auth client config
+│   │   └── utils.ts          # Utility functions
+│   └── hooks/                # Custom React hooks
+├── drizzle/                  # Database migrations
+├── public/                   # Static assets
+├── Dockerfile               # Docker configuration
+└── drizzle.config.ts        # Drizzle ORM configuration
+```
+
+## 🛠️ Available Scripts
+
+- `bun run dev` - Start development server
+- `bun run build` - Build for production
+- `bun run start` - Start production server
+- `bun run lint` - Run ESLint
+
+## 🐳 Docker Deployment
+
+Build and run with Docker:
+
+```bash
+# Build the image
+docker build -t boilerplate .
+
+# Run the container
+docker run -p 3000:3000 \
+  -e DATABASE_URL=your_database_url \
+  -e BETTER_AUTH_SECRET=your_secret \
+  -e BETTER_AUTH_URL=http://localhost:3000 \
+  boilerplate
+```
+
+## 🔧 Configuration
+
+### Database
+
+The project uses Drizzle ORM with PostgreSQL. Configure your database connection in `drizzle.config.ts` and set the `DATABASE_URL` environment variable.
+
+### Authentication
+
+Better Auth is configured in `src/lib/auth.ts`. The admin plugin is enabled by default. Customize authentication providers and settings as needed.
+
+### UI Components
+
+shadcn/ui components are configured in `components.json`. Add new components using:
+
+```bash
+npx shadcn@latest add [component-name]
+```
+
+## 📚 Learn More
+
+- [Next.js Documentation](https://nextjs.org/docs)
+- [Drizzle ORM Documentation](https://orm.drizzle.team/docs/overview)
+- [Better Auth Documentation](https://www.better-auth.com/docs)
+- [shadcn/ui Documentation](https://ui.shadcn.com/docs)
+- [Bun Documentation](https://bun.sh/docs)
+
+## 📝 License
+
+This project is open source and available under the [MIT License](LICENSE).
