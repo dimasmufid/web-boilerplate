@@ -5,12 +5,12 @@ import {
   IconBan,
   IconFilter,
   IconLock,
+  IconDots,
   IconRefresh,
   IconSearch,
   IconShieldLock,
   IconUserCheck,
   IconUserPlus,
-  IconUsers,
 } from "@tabler/icons-react"
 import { toast } from "sonner"
 
@@ -43,6 +43,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
+import { Skeleton } from "@/components/ui/skeleton"
 import {
   Table,
   TableBody,
@@ -68,6 +69,20 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 type UserRecord = {
   id: string
@@ -144,6 +159,9 @@ export default function AdminPage() {
   const [isLoading, setIsLoading] = React.useState(false)
   const [selectedUser, setSelectedUser] = React.useState<UserRecord | null>(null)
   const [actionLoading, setActionLoading] = React.useState<string | null>(null)
+  const [actionTab, setActionTab] = React.useState<
+    "roles" | "ban" | "security" | "sessions"
+  >("roles")
 
   const [createForm, setCreateForm] = React.useState({
     name: "",
@@ -159,15 +177,6 @@ export default function AdminPage() {
 
   const sessionRoles = normalizeRoles(session?.user?.role)
   const isAdmin = sessionRoles.includes("admin")
-
-  const stats = React.useMemo(() => {
-    const total = listMeta.total ?? users.length
-    const admins = users.filter((user) =>
-      normalizeRoles(user.role).includes("admin")
-    ).length
-    const banned = users.filter((user) => user.banned).length
-    return { total, admins, banned }
-  }, [listMeta.total, users])
 
   const loadUsers = React.useCallback(async (currentQuery: ListQuery) => {
     setIsLoading(true)
@@ -206,7 +215,6 @@ export default function AdminPage() {
         limit: result?.limit ?? currentQuery.limit,
         offset: result?.offset ?? currentQuery.offset,
       })
-      toast.success("Users loaded.", { id: toastId })
     } catch (error) {
       toast.error(formatError(error), { id: toastId })
     } finally {
@@ -449,28 +457,11 @@ export default function AdminPage() {
   const canGoNext =
     listMeta.total !== undefined &&
     query.offset + query.limit < (listMeta.total ?? 0)
+  const showSkeleton = isLoading && users.length === 0
 
   return (
     <div className="@container/main flex flex-1 flex-col gap-6">
       <div className="flex flex-col gap-4 px-4 pt-6 lg:px-6">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold">Admin control center</h1>
-            <p className="text-muted-foreground text-sm">
-              Manage accounts, roles, and security actions with Better Auth.
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="outline" className="gap-1">
-              <IconShieldLock className="size-3.5" />
-              {isPending ? "Checking session" : isAdmin ? "Admin" : "Member"}
-            </Badge>
-            <Badge variant="secondary" className="gap-1">
-              <IconUsers className="size-3.5" />
-              {stats.total} total users
-            </Badge>
-          </div>
-        </div>
         {!isPending && !isAdmin ? (
           <Alert variant="destructive">
             <IconShieldLock />
@@ -481,54 +472,6 @@ export default function AdminPage() {
             </AlertDescription>
           </Alert>
         ) : null}
-        <div className="grid gap-4 md:grid-cols-3">
-          <Card>
-            <CardHeader>
-              <CardTitle>Total users</CardTitle>
-              <CardDescription>
-                {listMeta.total !== undefined
-                  ? `${listMeta.total} in directory`
-                  : "Loading directory"}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-semibold">{stats.total}</div>
-              <p className="text-muted-foreground text-sm">
-                {listMeta.limit !== undefined
-                  ? `Showing ${users.length} of ${listMeta.total}`
-                  : "All results currently loaded"}
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Admins</CardTitle>
-              <CardDescription>Users with elevated permissions</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-semibold">{stats.admins}</div>
-              <p className="text-muted-foreground text-sm">
-                {stats.admins === 0
-                  ? "No admin roles detected"
-                  : "Includes custom role assignments"}
-              </p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader>
-              <CardTitle>Banned</CardTitle>
-              <CardDescription>Accounts blocked from signing in</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-semibold">{stats.banned}</div>
-              <p className="text-muted-foreground text-sm">
-                {stats.banned === 0
-                  ? "No active bans"
-                  : "Review bans regularly"}
-              </p>
-            </CardContent>
-          </Card>
-        </div>
       </div>
 
       <div className="grid gap-6 px-4 pb-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:px-6">
@@ -621,7 +564,11 @@ export default function AdminPage() {
 
             <div className="flex items-center justify-between text-sm">
               <div className="text-muted-foreground">
-                Showing {users.length} of {listMeta.total ?? 0}
+                {showSkeleton ? (
+                  <Skeleton className="h-4 w-32" />
+                ) : (
+                  `Showing ${users.length} of ${listMeta.total ?? 0}`
+                )}
               </div>
               <div className="flex items-center gap-2">
                 <Label htmlFor="page-size" className="text-xs">
@@ -676,10 +623,40 @@ export default function AdminPage() {
                     <TableHead>Role</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Created</TableHead>
+                    <TableHead className="w-12 text-right">More</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {users.length ? (
+                  {showSkeleton ? (
+                    Array.from({ length: 5 }).map((_, index) => (
+                      <TableRow key={`skeleton-row-${index}`}>
+                        <TableCell>
+                          <div className="flex flex-col gap-2">
+                            <Skeleton className="h-4 w-32" />
+                            <Skeleton className="h-3 w-40" />
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Skeleton className="h-4 w-40" />
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-2">
+                            <Skeleton className="h-5 w-16" />
+                            <Skeleton className="h-5 w-12" />
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Skeleton className="h-5 w-16" />
+                        </TableCell>
+                        <TableCell>
+                          <Skeleton className="h-4 w-24" />
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Skeleton className="ml-auto h-8 w-8" />
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  ) : users.length ? (
                     users.map((user) => {
                       const roles = normalizeRoles(user.role)
                       const isSelected = selectedUser?.id === user.id
@@ -727,12 +704,70 @@ export default function AdminPage() {
                             )}
                           </TableCell>
                           <TableCell>{formatDate(user.createdAt)}</TableCell>
+                          <TableCell className="text-right">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={(event) => event.stopPropagation()}
+                                >
+                                  <IconDots className="size-4" />
+                                  <span className="sr-only">More actions</span>
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    handleSelectUser(user)
+                                    setActionTab("roles")
+                                  }}
+                                >
+                                  Select user
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    handleSelectUser(user)
+                                    setActionTab("roles")
+                                  }}
+                                >
+                                  Set role
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    handleSelectUser(user)
+                                    setActionTab("security")
+                                  }}
+                                >
+                                  Reset password
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    handleSelectUser(user)
+                                    setActionTab("ban")
+                                  }}
+                                >
+                                  Ban or unban
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => {
+                                    handleSelectUser(user)
+                                    setActionTab("sessions")
+                                  }}
+                                >
+                                  Session controls
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
                         </TableRow>
                       )
                     })
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center">
+                      <TableCell colSpan={6} className="text-center">
                         {isLoading ? "Loading users..." : "No users found."}
                       </TableCell>
                     </TableRow>
@@ -765,14 +800,20 @@ export default function AdminPage() {
         </Card>
 
         <div className="flex flex-col gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Create user</CardTitle>
-              <CardDescription>
-                Add a new account with optional role assignment.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button className="w-full" type="button">
+                <IconUserPlus />
+                Create user
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Create user</DialogTitle>
+                <DialogDescription>
+                  Add a new account with optional role assignment.
+                </DialogDescription>
+              </DialogHeader>
               <form className="grid gap-4" onSubmit={handleCreateUser}>
                 <Field>
                   <FieldLabel htmlFor="create-name">Name</FieldLabel>
@@ -840,8 +881,8 @@ export default function AdminPage() {
                   {actionLoading === "create-user" ? "Creating..." : "Create user"}
                 </Button>
               </form>
-            </CardContent>
-          </Card>
+            </DialogContent>
+          </Dialog>
 
           <Card>
             <CardHeader>
@@ -862,7 +903,13 @@ export default function AdminPage() {
                   />
                 </Field>
               </FieldGroup>
-              <Tabs defaultValue="roles" className="mt-4">
+              <Tabs
+                value={actionTab}
+                onValueChange={(value) =>
+                  setActionTab(value as typeof actionTab)
+                }
+                className="mt-4"
+              >
                 <TabsList className="grid w-full grid-cols-4">
                   <TabsTrigger value="roles">Roles</TabsTrigger>
                   <TabsTrigger value="ban">Bans</TabsTrigger>

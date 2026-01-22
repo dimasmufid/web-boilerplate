@@ -6,8 +6,6 @@ import {
   IconInnerShadowTop,
   IconUsers,
   IconSettings,
-  IconHelp,
-  IconSearch,
 } from "@tabler/icons-react"
 
 import Link from "next/link"
