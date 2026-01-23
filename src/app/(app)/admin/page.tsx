@@ -84,7 +84,6 @@ type ListQuery = {
   sortDirection: "asc" | "desc"
   limit: number
   offset: number
-  bannedFilter: "all" | "banned" | "active"
 }
 
 const defaultQuery: ListQuery = {
@@ -94,7 +93,6 @@ const defaultQuery: ListQuery = {
   sortDirection: "desc",
   limit: 20,
   offset: 0,
-  bannedFilter: "all",
 }
 
 function formatError(error: unknown) {
@@ -173,7 +171,9 @@ export default function AdminPage() {
   const loadUsers = React.useCallback(async (currentQuery: ListQuery) => {
     setIsLoading(true)
     try {
-      const payload: Record<string, unknown> = {
+      const payload: NonNullable<
+        Parameters<typeof authClient.admin.listUsers>[0]
+      >["query"] = {
         searchField: currentQuery.searchField,
         sortBy: currentQuery.sortBy,
         sortDirection: currentQuery.sortDirection,
@@ -185,15 +185,7 @@ export default function AdminPage() {
         payload.searchValue = currentQuery.searchValue.trim()
       }
 
-      if (currentQuery.bannedFilter !== "all") {
-        payload.filterField = "banned"
-        payload.filterOperator = "eq"
-        payload.filterValue = currentQuery.bannedFilter === "banned"
-      }
-
-      const { data, error } = await authClient.admin.listUsers(
-        payload as unknown as Parameters<typeof authClient.admin.listUsers>[0]
-      )
+      const { data, error } = await authClient.admin.listUsers({ query: payload })
       if (error) {
         throw error
       }
@@ -423,13 +415,13 @@ export default function AdminPage() {
           <CardContent className="flex flex-col gap-4">
             <Dialog>
               <form
-                className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_auto]"
+                className="grid gap-4 lg:grid-cols-[minmax(0,360px)_minmax(0,220px)_minmax(0,1fr)] lg:items-end"
                 onSubmit={(event) => {
                   event.preventDefault()
                   applyQuery({ offset: 0 })
                 }}
               >
-                <Field>
+                <Field className="w-full max-w-[360px]">
                   <FieldLabel htmlFor="search">Search</FieldLabel>
                   <div className="relative">
                     <IconSearch className="text-muted-foreground pointer-events-none absolute left-3 top-3 size-4" />
@@ -447,7 +439,7 @@ export default function AdminPage() {
                     />
                   </div>
                 </Field>
-                <Field>
+                <Field className="w-full max-w-[220px]">
                   <FieldLabel htmlFor="search-field">Search field</FieldLabel>
                   <Select
                     value={query.searchField}
@@ -461,24 +453,6 @@ export default function AdminPage() {
                     <SelectContent>
                       <SelectItem value="email">Email</SelectItem>
                       <SelectItem value="name">Name</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </Field>
-                <Field>
-                  <FieldLabel htmlFor="banned-filter">Ban status</FieldLabel>
-                  <Select
-                    value={query.bannedFilter}
-                    onValueChange={(value: ListQuery["bannedFilter"]) =>
-                      setQuery((prev) => ({ ...prev, bannedFilter: value }))
-                    }
-                  >
-                    <SelectTrigger id="banned-filter">
-                      <SelectValue placeholder="Filter" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All users</SelectItem>
-                      <SelectItem value="active">Active only</SelectItem>
-                      <SelectItem value="banned">Banned only</SelectItem>
                     </SelectContent>
                   </Select>
                 </Field>
@@ -497,7 +471,7 @@ export default function AdminPage() {
                     Refresh
                   </Button>
                   <DialogTrigger asChild>
-                    <Button type="button">
+                    <Button type="button" className="ml-auto shadow-sm">
                       <IconUserPlus />
                       Create user
                     </Button>
