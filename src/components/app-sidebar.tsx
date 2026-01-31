@@ -41,18 +41,18 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         ? session.user.role.split(",").map((role) => role.trim())
         : []
   const isAdmin = roles.includes("admin")
-  const navMain = isAdmin
-    ? [
-        ...baseNav,
-        {
-          title: "Admin",
-          url: "/admin",
-          icon: IconUsers,
-        },
-      ]
-    : baseNav
+  const navMain = baseNav
 
   const navSecondary = [
+    ...(isAdmin
+      ? [
+          {
+            title: "Admin",
+            url: "/admin",
+            icon: IconUsers,
+          },
+        ]
+      : []),
     {
       title: "Settings",
       url: "#",

@@ -147,6 +147,7 @@ export default function AdminPage() {
     type: "role" | "password" | "ban"
     user: UserRecord
   } | null>(null)
+  const [createDialogOpen, setCreateDialogOpen] = React.useState(false)
 
   const [createForm, setCreateForm] = React.useState<{
     name: string
@@ -247,6 +248,7 @@ export default function AdminPage() {
       toast.success("User created.", { id: toastId })
       setCreateForm({ name: "", email: "", password: "", role: "user" })
       setCreateConfirmPassword("")
+      setCreateDialogOpen(false)
       await loadUsers({ ...query, offset: 0 })
     } catch (error) {
       toast.error(formatError(error), { id: toastId })
@@ -413,7 +415,10 @@ export default function AdminPage() {
       <div className="grid gap-6 px-4 lg:px-6">
         <Card className="min-h-[480px]">
           <CardContent className="flex flex-col gap-4">
-            <Dialog>
+            <Dialog
+              open={createDialogOpen}
+              onOpenChange={(open) => setCreateDialogOpen(open)}
+            >
               <form
                 className="grid gap-4 lg:grid-cols-[minmax(0,360px)_minmax(0,220px)_minmax(0,1fr)] lg:items-end"
                 onSubmit={(event) => {
